@@ -1,0 +1,88 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: healthdb
+      POSTGRES_USER: healthuser
+      POSTGRES_PASSWORD: healthpass
+    ports: ["5432:5432"]
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U healthuser -d healthdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  
+  mlflow:
+    image: python:3.11-slim
+    working_dir: /mlflow
+    command:
+      - sh
+      - -c
+      - >-
+        pip install --no-cache-dir --default-timeout=120 --retries=10
+        mlflow==2.20.3 sqlalchemy==2.0.38 psycopg2-binary==2.9.10
+        && mlflow server --host 0.0.0.0 --port 5000
+        --backend-store-uri postgresql://healthuser:healthpass@postgres:5432/healthdb
+        --default-artifact-root /mlflow/artifacts
+    ports: ["5000:5000"]
+    volumes: [mlflow_artifacts:/mlflow/artifacts]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: sh -c "python train_model.py"
+    environment:
+      MODEL_PATH: /app/models/models.joblib
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    volumes: [model_data:/app/models]
+    depends_on: [mlflow]
+    restart: "no"
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      MODEL_PATH: /app/models/models.joblib
+      DATABASE_URL: postgresql://healthuser:healthpass@postgres:5432/healthdb
+    ports: ["8000:8000"]
+    volumes: [model_data:/app/models:ro]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      trainer:
+        condition: service_completed_successfully
+    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    environment:
+      PYTHONPATH: /app 
+      API_URL: http://api:8000
+    ports: ["8501:8501"]
+    depends_on: [api]
+    restart: unless-stopped
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports: ["9090:9090"]
+    volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    depends_on: [api]
+  grafana:
+    image: grafana/grafana:11.4.0
+    ports: ["3000:3000"]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+volumes:
+  postgres_data:
+  mlflow_artifacts:
+  model_data:

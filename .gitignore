@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+models/*.joblib
+*.db
+mlruns/
+.DS_Store
+!.env.example
+*.py[cod]
+mlruns/
+.streamlit/secrets.toml
