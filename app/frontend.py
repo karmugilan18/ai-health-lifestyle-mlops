@@ -4,7 +4,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 from app.nutrition import FOODS
-API_URL=os.getenv("API_URL","http://localhost:8000")
+API_URL = st.secrets.get("API_URL", os.getenv("API_URL", "http://localhost:8000"))
 st.set_page_config(page_title="Lifestyle Monitor",page_icon="🌿",layout="wide")
 st.title("🌿 AI-Based Personalized Health & Lifestyle Risk Monitoring")
 st.caption("ML + MLOps demo • Not a medical diagnosis")
