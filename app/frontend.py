@@ -1,4 +1,7 @@
 import os, requests, pandas as pd, streamlit as st
+from pathlib import Path
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 from app.nutrition import FOODS
 API_URL=os.getenv("API_URL","http://localhost:8000")
 st.set_page_config(page_title="Lifestyle Monitor",page_icon="🌿",layout="wide")
